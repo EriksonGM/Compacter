@@ -18,55 +18,10 @@ namespace Compacter
     {
         private static InternalConfig config = new InternalConfig();
 
-        public class InternalConfig
-        {
-            public InternalConfig()
-            {
-                try
-                {
-                    Conn = ConfigurationManager.AppSettings["conn"];
-                    TableSelect = ConfigurationManager.AppSettings["tableSelect"];
-                    TableUpdate = ConfigurationManager.AppSettings["tableUpdate"];
-                    SelectProps = ConfigurationManager.AppSettings["updateProps"].Split(',').ToList();
-                    UpdadeProps = ConfigurationManager.AppSettings["selectProps"].Split(',').ToList();
-                    ConsultQuery = ConfigurationManager.AppSettings["consultQuery"];
-
-                    SelectQuery = "Select ";
-                    SelectProps.ForEach(x =>
-                    {
-                        SelectQuery += x + ",";
-                    });
-
-                    SelectQuery = SelectQuery.Substring(0, SelectQuery.Length - 1);
-
-                    SelectQuery += " from " + TableSelect + " where " + SelectProps[0] + "=@" + SelectProps[0];
-
-                    //--
-                    UpdateQuery = "Update " + TableUpdate + " set " + UpdadeProps[1] + "=@FileData Where " + UpdadeProps[0] + "=@Id";
-
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex.Message);
-                }
-            }
-
-            public string Conn { get; protected set; }
-            public string TableSelect { get; protected set; }
-            public string TableUpdate { get; protected set; }
-            public List<string> SelectProps { get; protected set; }
-            public List<string> UpdadeProps { get; protected set; }
-            public string SelectQuery { get; protected set; }
-            public string UpdateQuery { get; protected set; }
-            public string InsertQuery { get; set; } = "Insert Into TestFile (Id_File,Nome,FileData) values (NEWID(),@Nome,@FileData)";
-            public string DeleteQuery { get; protected set; } = "Delete from TestFile";
-            public string ConsultQuery { get; protected set; }
-        }
-
         static void Main(string[] args)
         {
-            Console.WriteLine("PDF Compacter ver 0.1\n");
-
+            Console.WriteLine("Benvindo a PDF Compacter 0.1\n");
+            
             InternalConfig config = new InternalConfig();
 
             string cmd = string.Empty;
@@ -110,6 +65,46 @@ namespace Compacter
 
                 Console.Write("\n->");
             }
+        }
+        
+        public class InternalConfig
+        {
+            public InternalConfig()
+            {
+                try
+                {
+                    Conn = ConfigurationManager.AppSettings["conn"];
+                    TableFile = ConfigurationManager.AppSettings["tableFile"];
+                    TableInfo = ConfigurationManager.AppSettings["tableInfo"];
+                    FileId = ConfigurationManager.AppSettings["fileId"];
+                    FileContent = ConfigurationManager.AppSettings["fileContent"];
+                    FileProperty = ConfigurationManager.AppSettings["fileProperty"];
+                    ConsultQuery = ConfigurationManager.AppSettings["consultQuery"];
+
+                    SelectQuery = $"Select {FileContent} from {TableFile} Where {FileId} = @IdFile";
+                    //--
+                    UpdateQuery = $"Update {TableFile} set  {FileContent} = @FileData Where {FileId} = @IdFile";
+
+                    Console.WriteLine("Configurações carregadas com exito.");
+
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
+            }
+
+            public string Conn { get; protected set; }
+            public string TableFile { get; protected set; }
+            public string TableInfo { get; protected set; }
+            public string FileProperty { get; protected set; }
+            public string FileContent { get; protected set; }
+            public string FileId { get; protected set; }
+            public string SelectQuery { get; protected set; }
+            public string UpdateQuery { get; protected set; }
+            public string InsertQuery { get; set; } = "Insert Into TestFile (Id_File,Nome,FileData) values (NEWID(),@Nome,@FileData)";
+            public string DeleteQuery { get; protected set; } = "Delete from TestFile";
+            public string ConsultQuery { get; protected set; }
         }
 
         public static void Fecha()
@@ -304,13 +299,9 @@ namespace Compacter
 
         private static void Optimize()
         {
-            var inicio = DateTime.Now;
-
-            var dump = Directory.GetCurrentDirectory() + @"\dump";
-            var dumped = Directory.GetCurrentDirectory() + @"\dumped";
-
-            Console.WriteLine("Optimizando Ficheiros:");
-
+            
+            Console.Write("Carregando Consulta:");
+            
             var ids = new List<Guid>();
 
             try
@@ -337,13 +328,32 @@ namespace Compacter
             {
                 Console.Write(" - " + ex.Message + ".\n");
             }
+            
+            Console.Write($"{ids.Count} Ficheiros Detectados.\n->Deseja Continuar? (S/N) ");
 
+            if (Console.ReadLine() == "S")
+            {
+                IniciarOptimizacao(ids);
+            }
+            else
+            {
+                Console.WriteLine("Optimização Cancelada");
+            }
+        }
 
-            Console.WriteLine(ids.Count + " ficheiros a optimizar.");
+        private static void IniciarOptimizacao(List<Guid> ids)
+        {
+            //Console.WriteLine(ids.Count + " ficheiros a optimizar.");
+            var inicio = DateTime.Now;
 
             var i = 1;
+            
+            var dump = Directory.GetCurrentDirectory() + @"\dump";
 
+            var dumped = Directory.GetCurrentDirectory() + @"\dumped";
 
+            float actualSize = 0;
+            float NewSize = 0;
             ids.ForEach(x =>
             {
                 //Console.WriteLine(" - Optimizando ficheiros.");
@@ -356,37 +366,38 @@ namespace Compacter
 
                         var query = config.SelectQuery;
 
-                        var cmd = new SqlCommand(query, conn);
+                        var cmdSelect = new SqlCommand(query, conn);
 
-                        cmd.Parameters.AddWithValue("@" + config.SelectProps[0], x.ToString());
+                        cmdSelect.Parameters.AddWithValue("@IdFile", x.ToString());
 
-                        SqlDataReader reader = cmd.ExecuteReader();
+                        SqlDataReader reader = cmdSelect.ExecuteReader();
                         //--Descargar--//
                         if (reader.Read())
                         {
-                            File.WriteAllBytes(dump, (byte[])reader[config.SelectProps[1]]);
+                            File.WriteAllBytes(dump, (byte[])reader[config.FileContent]);
                         }
 
                         reader.Dispose();
                         //--Optimizar--//
 
-
-
                         OptimizarDump();
                         //--Update--//
 
-
-
-                        var uCommand = new SqlCommand(config.UpdateQuery, conn);
-                        uCommand.Parameters.AddWithValue("@Id", x.ToString());
-                        var fileData = uCommand.Parameters.Add("@FileData", System.Data.SqlDbType.VarBinary);
+                        var cmdUodate = new SqlCommand(config.UpdateQuery, conn);
+                        cmdUodate.Parameters.AddWithValue("@IdFile", x.ToString());
+                        var fileData = cmdUodate.Parameters.Add("@FileData", System.Data.SqlDbType.VarBinary);
 
                         fileData.Value = File.ReadAllBytes(dumped);
 
-                        uCommand.ExecuteNonQuery();
+                        cmdUodate.ExecuteNonQuery();
                         DateTime end = DateTime.Now;
+                        
+                        var fiDump = new FileInfo(dump).Length;
+                        var fiDumper =new FileInfo(dumped).Length;
+                        actualSize += fiDump;
+                        NewSize += fiDumper;
                         //LimparLinea();
-                        Console.WriteLine("Ficheiros Optimizados ({0}/{1}) {2} seg", i, ids.Count, (end - begin).Seconds);
+                        Console.WriteLine($"Ficheiros Optimizados ({i}/{ids.Count}) - {(end - begin).Seconds} seg ( {fiDump/1024} Kb -> {fiDumper / 1024}Kb )");
                         i++;
                     }
                 }
@@ -399,9 +410,12 @@ namespace Compacter
 
             var fim = DateTime.Now;
             var duracao = fim - inicio;
-            Console.WriteLine("Data Inicio: " + DetalharData(inicio));
-            Console.WriteLine("Data Inicio: " + DetalharData(fim));
-            Console.WriteLine("Duração: " + DetalharData(duracao));
+            Console.WriteLine($"\nData Inicio: {DetalharData(inicio)}") ;
+            Console.WriteLine($"Data Fim: { DetalharData(fim)}\n");
+            Console.WriteLine($"Duração: {DetalharData(duracao)} - {((fim - inicio).TotalMinutes / ids.Count).ToString("F")} ficheiros por minuto.");
+            Console.WriteLine($"Espaço antes Optimização: {actualSize / 1024} Kb.");
+            Console.WriteLine($"Espaço depois Optimização: {NewSize / 1024} Kb.");
+            Console.WriteLine($"Total Optimizado {((actualSize - NewSize)/1024).ToString("F")} Kb");
             Console.WriteLine("\nOptimização Terminada");
         }
     }
