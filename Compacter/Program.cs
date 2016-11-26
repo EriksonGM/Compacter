@@ -9,6 +9,7 @@ using Ghostscript.NET.Processor;
 using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
+using System.Diagnostics;
 using System.Threading;
 
 
@@ -20,9 +21,9 @@ namespace Compacter
 
         static void Main(string[] args)
         {
-            Console.WriteLine("Benvindo a PDF Compacter 0.1\n");
-            
-            InternalConfig config = new InternalConfig();
+            Console.WriteLine("Benvindo a PDF Compacter 0.1");
+
+            //InternalConfig config = new InternalConfig();
 
             string cmd = string.Empty;
 
@@ -33,6 +34,7 @@ namespace Compacter
                 switch (cmd)
                 {
                     case "exit":
+                        Environment.Exit(0);
                         break;
 
                     case "start":
@@ -58,6 +60,11 @@ namespace Compacter
                     case "codigo":
                         UpdateCodigo();
                         break;
+
+                    case "teste":
+                        TesteIntegridade();
+                        break;
+
                     default:
                         Console.WriteLine("Comando desconhecido.");
                         break;
@@ -66,7 +73,7 @@ namespace Compacter
                 Console.Write("\n->");
             }
         }
-        
+
         public class InternalConfig
         {
             public InternalConfig()
@@ -83,7 +90,6 @@ namespace Compacter
 
                     SelectQuery = $"Select {FileContent} from {TableFile} Where {FileId} = @IdFile";
                     //--
-                    UpdateQuery = $"Update {TableFile} set  {FileContent} = @FileData Where {FileId} = @IdFile";
 
                     Console.WriteLine("Configurações carregadas com exito.");
 
@@ -101,7 +107,8 @@ namespace Compacter
             public string FileContent { get; protected set; }
             public string FileId { get; protected set; }
             public string SelectQuery { get; protected set; }
-            public string UpdateQuery { get; protected set; }
+
+            //public string UpdateQuery { get; protected set; }
             public string InsertQuery { get; set; } = "Insert Into TestFile (Id_File,Nome,FileData) values (NEWID(),@Nome,@FileData)";
             public string DeleteQuery { get; protected set; } = "Delete from TestFile";
             public string ConsultQuery { get; protected set; }
@@ -232,7 +239,7 @@ namespace Compacter
 
         private static void Uploader()
         {
-            InternalConfig config = new InternalConfig();
+            //InternalConfig config = new InternalConfig();
 
             Console.WriteLine("Subindo Ficheiros:");
 
@@ -250,15 +257,20 @@ namespace Compacter
                     {
                         conn.Open();
 
-                        string query = config.InsertQuery;
+                        SqlCommand cmd = new SqlCommand("UploadFile", conn);
 
-                        SqlCommand cmd = new SqlCommand(query, conn);
+                        cmd.CommandType = CommandType.StoredProcedure;
 
-                        cmd.Parameters.AddWithValue("@Nome", fi.Name);
+                        cmd.Parameters.AddWithValue("@FileId", Guid.NewGuid());
+                        cmd.Parameters.AddWithValue("@FileNome", fi.Name);
+                        cmd.Parameters.AddWithValue("@FileSize", fi.Length);
+
                         SqlParameter fileData = cmd.Parameters.Add("@FileData", SqlDbType.VarBinary);
+
                         fileData.Value = File.ReadAllBytes(s);
 
                         cmd.ExecuteNonQuery();
+
                         Console.Write(" - Subido.\n");
                     }
                 }
@@ -299,9 +311,9 @@ namespace Compacter
 
         private static void Optimize()
         {
-            
+
             Console.Write("Carregando Consulta:");
-            
+
             var ids = new List<Guid>();
 
             try
@@ -328,7 +340,7 @@ namespace Compacter
             {
                 Console.Write(" - " + ex.Message + ".\n");
             }
-            
+
             Console.Write($"{ids.Count} Ficheiros Detectados.\n->Deseja Continuar? (S/N) ");
 
             if (Console.ReadLine() == "S")
@@ -345,9 +357,9 @@ namespace Compacter
         {
             //Console.WriteLine(ids.Count + " ficheiros a optimizar.");
             var inicio = DateTime.Now;
-
+            CriarSP();
             var i = 1;
-            
+
             var dump = Directory.GetCurrentDirectory() + @"\dump";
 
             var dumped = Directory.GetCurrentDirectory() + @"\dumped";
@@ -361,6 +373,7 @@ namespace Compacter
                 {
                     using (var conn = new SqlConnection(config.Conn))
                     {
+
                         DateTime begin = DateTime.Now;
                         conn.Open();
 
@@ -383,21 +396,35 @@ namespace Compacter
                         OptimizarDump();
                         //--Update--//
 
-                        var cmdUodate = new SqlCommand(config.UpdateQuery, conn);
-                        cmdUodate.Parameters.AddWithValue("@IdFile", x.ToString());
-                        var fileData = cmdUodate.Parameters.Add("@FileData", System.Data.SqlDbType.VarBinary);
+                        //var cmdUodate = new SqlCommand(config.UpdateQuery, conn);
+                        //cmdUodate.Parameters.AddWithValue("@IdFile", x.ToString());
+                        //var fileData = cmdUodate.Parameters.Add("@FileData", System.Data.SqlDbType.VarBinary);
 
+                        //fileData.Value = File.ReadAllBytes(dumped);
+
+                        SqlCommand cmd = new SqlCommand("Optimizer", conn);
+
+                        cmd.CommandType = CommandType.StoredProcedure;
+
+                        cmd.Parameters.AddWithValue("@FileId", x.ToString());
+
+                        var fiDumped = new FileInfo(dumped).Length;
+                        cmd.Parameters.AddWithValue("@FileSize", fiDumped);
+
+                        SqlParameter fileData = cmd.Parameters.Add("@FileData", SqlDbType.VarBinary);
                         fileData.Value = File.ReadAllBytes(dumped);
 
-                        cmdUodate.ExecuteNonQuery();
+
+                        cmd.ExecuteNonQuery();
+
                         DateTime end = DateTime.Now;
-                        
+
                         var fiDump = new FileInfo(dump).Length;
-                        var fiDumper =new FileInfo(dumped).Length;
+                        //var fiDumped = new FileInfo(dumped).Length;
                         actualSize += fiDump;
-                        NewSize += fiDumper;
+                        NewSize += fiDumped;
                         //LimparLinea();
-                        Console.WriteLine($"Ficheiros Optimizados ({i}/{ids.Count}) - {(end - begin).Seconds} seg ( {fiDump/1024} Kb -> {fiDumper / 1024}Kb )");
+                        Console.WriteLine($"Ficheiros Optimizados ({i}/{ids.Count}) - {(end - begin).Seconds} seg ( {fiDump / 1024} Kb -> {fiDumped / 1024} Kb )");
                         i++;
                     }
                 }
@@ -407,16 +434,101 @@ namespace Compacter
                 }
             });
 
-
+            EliminarSP();
             var fim = DateTime.Now;
             var duracao = fim - inicio;
-            Console.WriteLine($"\nData Inicio: {DetalharData(inicio)}") ;
+            Console.WriteLine($"\nData Inicio: {DetalharData(inicio)}");
             Console.WriteLine($"Data Fim: { DetalharData(fim)}\n");
-            Console.WriteLine($"Duração: {DetalharData(duracao)} - {((fim - inicio).TotalMinutes / ids.Count).ToString("F")} ficheiros por minuto.");
-            Console.WriteLine($"Espaço antes Optimização: {actualSize / 1024} Kb.");
-            Console.WriteLine($"Espaço depois Optimização: {NewSize / 1024} Kb.");
-            Console.WriteLine($"Total Optimizado {((actualSize - NewSize)/1024).ToString("F")} Kb");
+            Console.WriteLine($"Duração: {DetalharData(duracao)} - {(ids.Count / (fim - inicio).TotalMinutes).ToString("F")} ficheiros por minuto.");
+            Console.WriteLine($"Espaço antes Optimização: {(actualSize / 1048576).ToString("F")} Mb.");
+            Console.WriteLine($"Espaço depois Optimização: {(NewSize / 1048576).ToString("F")} Mb.");
+            Console.WriteLine($"Total Optimizado {((actualSize - NewSize) / 1048576).ToString("F")} Mb");
             Console.WriteLine("\nOptimização Terminada");
+
+        }
+
+        private static void CriarSP()
+        {
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(config.Conn))
+                {
+                    string proc =
+                        $"Create Proc Optimizer @FileId Uniqueidentifier, @FileData VarBinary(MAX), @FileSize Int as Begin Update {config.TableFile} Set {config.FileContent} = @FileData Where {config.FileId} = @FileId; Update {config.TableInfo} Set {config.FileProperty} = @FileSize Where {config.FileId} = @FileId; End";
+
+                    var cmdSelect = new SqlCommand(proc, conn);
+                    conn.Open();
+                    cmdSelect.ExecuteNonQuery();
+                    conn.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+        }
+
+        private static void EliminarSP()
+        {
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(config.Conn))
+                {
+                    string proc = $"Drop Proc Optimizer";
+
+                    var cmdSelect = new SqlCommand(proc, conn);
+                    conn.Open();
+                    cmdSelect.ExecuteNonQuery();
+                    conn.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+        }
+
+        private static void TesteIntegridade()
+        {
+            try
+            {
+
+                Console.Write("Inserir chave do Ficheiro :");
+                var key = Guid.Parse(Console.ReadLine());
+
+                using (SqlConnection conn = new SqlConnection(config.Conn))
+                {
+
+                    var cmdSelect = new SqlCommand(config.SelectQuery, conn);
+
+                    cmdSelect.Parameters.AddWithValue("@IdFile", key);
+                    conn.Open();
+                    SqlDataReader reader = cmdSelect.ExecuteReader();
+
+                    //--Descargar--//
+                    if (reader.Read())
+                    {
+                        File.WriteAllBytes(Directory.GetCurrentDirectory() + @"\FicheiroTeste.pdf", (byte[])reader[config.FileContent]);
+                    }
+                    conn.Close();
+
+                    Console.WriteLine("Ficheiro guardado com exito");
+
+                    Process.Start("explorer.exe", Directory.GetCurrentDirectory());
+
+                    //conn.Open();
+                    //cmdSelect.ExecuteNonQuery();
+                    //conn.Close();
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Console.WriteLine("Teste cancelado");
+            }
         }
     }
 }
