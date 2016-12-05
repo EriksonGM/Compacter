@@ -21,7 +21,7 @@ namespace Compacter
 
         static void Main(string[] args)
         {
-            Console.WriteLine("Benvindo a PDF Compacter 0.1");
+            Console.WriteLine("Benvindo a PDF Compacter 0.2");
 
             //InternalConfig config = new InternalConfig();
 
@@ -29,48 +29,72 @@ namespace Compacter
 
             Console.Write("\n->");
 
-            while (!string.IsNullOrEmpty(cmd = Console.ReadLine()))
+            while (true)
             {
-                switch (cmd)
+                cmd = Console.ReadLine();
+
+                var c = string.IsNullOrEmpty(cmd.Split(' ')[0].ToLower()) ? "nulo" : cmd.Split(' ')[0].ToLower();
+
+                switch (cmd.Split(' ')[0])
                 {
                     case "exit":
                         Environment.Exit(0);
                         break;
 
-                    case "start":
-                        Compactar();
-                        break;
+                    //case "start":
+                    //    Compactar();
+                    //    break;
 
-                    case "upload":
-                        Uploader();
-                        break;
+                    //case "upload":
+                    //    Uploader();
+                    //    break;
 
-                    case "delete":
-                        Delete();
-                        break;
+                    //case "delete":
+                    //    Delete();
+                    //    break;
 
                     case "optimize":
                         Optimize();
                         break;
-
-                    case "data":
-                        Fecha();
-                        break;
-
-                    case "codigo":
-                        UpdateCodigo();
-                        break;
-
+                        
                     case "teste":
                         TesteIntegridade();
                         break;
 
+                    case "config":
+                        Config();
+                        break;
+
+                    case "conn":
+                        Connection();
+                        break;
                     default:
                         Console.WriteLine("Comando desconhecido.");
                         break;
                 }
 
                 Console.Write("\n->");
+            }
+        }
+
+        private static void Connection()
+        {
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(config.Conn))
+                {
+                    var cmd = new SqlCommand("Select NewID()", conn);
+                    conn.Open();
+                    var result = cmd.ExecuteNonQuery();
+                    conn.Close();
+
+                    Console.WriteLine("Teste de Conexão com exito.");
+                }
+            }
+            catch (SqlException ex)
+            {
+                Console.WriteLine(ex.Message);
+                Console.WriteLine("Erro no teste de conexão");
             }
         }
 
@@ -114,13 +138,7 @@ namespace Compacter
             public string ConsultQuery { get; protected set; }
         }
 
-        public static void Fecha()
-        {
-            var inicio = DateTime.Now;
-            Console.WriteLine("Data Inicio: " + DetalharData(inicio));
-        }
-
-        private static string DetalharData(DateTime data)
+       private static string DetalharData(DateTime data)
         {
             return
                 $"{data.DayOfWeek.ToString()},{data.Day}/{data.Month}/{data.Year} - {data.Hour}:{data.Minute}:{data.Second}:{data.Millisecond}";
@@ -132,33 +150,22 @@ namespace Compacter
                 $"{data.Hours}:{data.Minutes}:{data.Seconds}:{data.Milliseconds}";
         }
 
-        private static void UpdateCodigo()
+    private static void Config()
         {
-            Console.WriteLine("Escolha a query");
-            var text = Console.ReadLine();
+            Console.WriteLine("Configurações");
+            Console.WriteLine($"--Connection String:=  {config.Conn}");
+            Console.WriteLine($"--Consult Query:=  {config.ConsultQuery}");
+            Console.WriteLine($"--Select Query:=  {config.SelectQuery}");
+            Console.WriteLine($"--Files ID Properties:=  {config.FileId}");
+            Console.WriteLine($"--Files Binary Table:=  {config.TableFile}");
+            Console.WriteLine($"--Files Binary Properties:=  {config.FileContent}");
+            Console.WriteLine($"--Files Info Table:=  {config.TableInfo}");
+            Console.WriteLine($"--Files Info Properties:=  {config.FileProperty}");
+            
         }
 
-        public static void LimparLinea()
-        {
-            Console.SetCursorPosition(0, Console.CursorTop - 1);
-            Console.Write(new string(' ', Console.WindowWidth));
-            Console.SetCursorPosition(0, Console.CursorTop - 1);
-        }
-
-        private static void Compactar()
-        {
-            string[] files = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.pdf");
-
-            foreach (string s in files)
-            {
-                //UtilzariText(s);
-                UtilizarGhostScript(s);
-            }
-
-            Console.WriteLine("Terminado");
-        }
-
-        private static void UtilizarGhostScript(string path)
+        
+        private static void StarOptimizer(string path)
         {
             //GhostscriptVersionInfo gv = GhostscriptVersionInfo.GetLastInstalledVersion();
 
@@ -237,7 +244,21 @@ namespace Compacter
             }
         }
 
-        private static void Uploader()
+        #region INTERNAL
+        /* private static void Compactar()
+        {
+            string[] files = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.pdf");
+
+            foreach (string s in files)
+            {
+                //UtilzariText(s);
+                StarOptimizer(s);
+            }
+
+            Console.WriteLine("Terminado");
+        }
+         
+            private static void Uploader()
         {
             //InternalConfig config = new InternalConfig();
 
@@ -309,6 +330,9 @@ namespace Compacter
             }
         }
 
+         */
+        #endregion
+
         private static void Optimize()
         {
 
@@ -358,7 +382,7 @@ namespace Compacter
             //Console.WriteLine(ids.Count + " ficheiros a optimizar.");
             var inicio = DateTime.Now;
             CriarSP();
-            var i = 1;
+            var i = 0;
 
             var dump = Directory.GetCurrentDirectory() + @"\dump";
 
@@ -373,7 +397,7 @@ namespace Compacter
                 {
                     using (var conn = new SqlConnection(config.Conn))
                     {
-
+                        i++;
                         DateTime begin = DateTime.Now;
                         conn.Open();
 
@@ -425,7 +449,7 @@ namespace Compacter
                         NewSize += fiDumped;
                         //LimparLinea();
                         Console.WriteLine($"Ficheiros Optimizados ({i}/{ids.Count}) - {(end - begin).Seconds} seg ( {fiDump / 1024} Kb -> {fiDumped / 1024} Kb )");
-                        i++;
+                        
                     }
                 }
                 catch (Exception ex)
