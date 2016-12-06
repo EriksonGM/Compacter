@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.Design;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -68,6 +69,10 @@ namespace Compacter
                     case "conn":
                         Connection();
                         break;
+
+                    case "help":
+                        Help();
+                        break;
                     default:
                         Console.WriteLine("Comando desconhecido.");
                         break;
@@ -75,6 +80,16 @@ namespace Compacter
 
                 Console.Write("\n->");
             }
+        }
+
+        private static void Help()
+        {
+            Console.WriteLine("Comandos:");
+            Console.WriteLine("optimize: Iniciar Optimização.");
+            Console.WriteLine("config: Mostrar configurações actuais da aplicação.");
+            Console.WriteLine("conn: Testar comunicação ao servidor utilizando configurações actuais");
+            Console.WriteLine("teste: Realizar teste de integridade a ficheiro.");
+            Console.WriteLine("help: Mostrar comandos de ajuda.");
         }
 
         private static void Connection()
