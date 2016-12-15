@@ -42,22 +42,10 @@ namespace Compacter
                         Environment.Exit(0);
                         break;
 
-                    //case "start":
-                    //    Compactar();
-                    //    break;
-
-                    //case "upload":
-                    //    Uploader();
-                    //    break;
-
-                    //case "delete":
-                    //    Delete();
-                    //    break;
-
                     case "optimize":
                         Optimize();
                         break;
-                        
+
                     case "teste":
                         TesteIntegridade();
                         break;
@@ -84,7 +72,7 @@ namespace Compacter
 
         private static void Help()
         {
-            Console.WriteLine("Comandos:");
+            Console.WriteLine("Comandos");
             Console.WriteLine("optimize: Iniciar Optimização.");
             Console.WriteLine("config: Mostrar configurações actuais da aplicação.");
             Console.WriteLine("conn: Testar comunicação ao servidor utilizando configurações actuais");
@@ -153,7 +141,7 @@ namespace Compacter
             public string ConsultQuery { get; protected set; }
         }
 
-       private static string DetalharData(DateTime data)
+        private static string DetalharData(DateTime data)
         {
             return
                 $"{data.DayOfWeek.ToString()},{data.Day}/{data.Month}/{data.Year} - {data.Hour}:{data.Minute}:{data.Second}:{data.Millisecond}";
@@ -165,7 +153,7 @@ namespace Compacter
                 $"{data.Hours}:{data.Minutes}:{data.Seconds}:{data.Milliseconds}";
         }
 
-    private static void Config()
+        private static void Config()
         {
             Console.WriteLine("Configurações");
             Console.WriteLine($"--Connection String:=  {config.Conn}");
@@ -176,10 +164,10 @@ namespace Compacter
             Console.WriteLine($"--Files Binary Properties:=  {config.FileContent}");
             Console.WriteLine($"--Files Info Table:=  {config.TableInfo}");
             Console.WriteLine($"--Files Info Properties:=  {config.FileProperty}");
-            
+
         }
 
-        
+
         private static void StarOptimizer(string path)
         {
             //GhostscriptVersionInfo gv = GhostscriptVersionInfo.GetLastInstalledVersion();
@@ -405,6 +393,7 @@ namespace Compacter
 
             float actualSize = 0;
             float NewSize = 0;
+
             ids.ForEach(x =>
             {
                 //Console.WriteLine(" - Optimizando ficheiros.");
@@ -453,18 +442,26 @@ namespace Compacter
                         SqlParameter fileData = cmd.Parameters.Add("@FileData", SqlDbType.VarBinary);
                         fileData.Value = File.ReadAllBytes(dumped);
 
-
-                        cmd.ExecuteNonQuery();
-
-                        DateTime end = DateTime.Now;
-
                         var fiDump = new FileInfo(dump).Length;
-                        //var fiDumped = new FileInfo(dumped).Length;
-                        actualSize += fiDump;
-                        NewSize += fiDumped;
-                        //LimparLinea();
-                        Console.WriteLine($"Ficheiros Optimizados ({i}/{ids.Count}) - {(end - begin).Seconds} seg ( {fiDump / 1024} Kb -> {fiDumped / 1024} Kb )");
+
+                        if (fiDump < fiDumped)
+                        {
+                            Console.WriteLine($"Optimização não viavel");
+                        }
+                        else
+                        {
+                            cmd.ExecuteNonQuery();
+
+                            DateTime end = DateTime.Now;
+                            
+                            //var fiDumped = new FileInfo(dumped).Length;
+                            actualSize += fiDump;
+                            NewSize += fiDumped;
+                            //LimparLinea();
+                            Console.WriteLine($"Ficheiros Optimizados ({i}/{ids.Count}) - {(end - begin).Seconds} seg ( {fiDump / 1024} Kb -> {fiDumped / 1024} Kb )");
+                        }
                         
+
                     }
                 }
                 catch (Exception ex)
